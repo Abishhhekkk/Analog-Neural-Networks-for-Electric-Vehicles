@@ -1,0 +1,162 @@
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h> 
+#include <OneWire.h> 
+#include <DallasTemperature.h> 
+#include "RTClib.h" 
+LiquidCrystal_I2C lcd1(0x25, 16, 2); 
+LiquidCrystal_I2C lcd2(0x26, 16, 2); 
+LiquidCrystal_I2C lcd3(0x27, 16, 2); 
+OneWire oneWire(15); 
+DallasTemperature sensors(&oneWire); 
+RTC_DS3231 rtc; 
+void setup() { 
+Serial.begin(115200); 
+analogReadResolution(12); 
+lcd1.begin(); 
+lcd1.setBacklight(true); 
+lcd2.begin(); 
+lcd2.setBacklight(true); 
+lcd3.begin(); 
+lcd3.setBacklight(true); 
+sensors.begin(); 
+rtc.begin();} 
+void loop() { 
+int adc32 = analogRead(32); 
+int adc33 = analogRead(33); 
+float voltage32 = (adc32 / 4095.0) * 3.3; 
+52 
+float voltage33 = (adc33 / 4095.0) * 3.3; 
+float soc = constrain((voltage32 / 3.3) * 100.0, 0, 100); 
+float mileage = (soc / 100.0) * 80.0; 
+String pattern = "Moderate"; 
+float adjustedMileage = mileage; 
+if (voltage33 < (0.25 * 3.3)) { 
+adjustedMileage += mileage * 0.0075; 
+pattern = "Eco"; 
+} else if (voltage33 > (0.75 * 3.3)) { 
+adjustedMileage -= mileage * 0.045; 
+pattern = "Aggressive"; 
+} else { 
+adjustedMileage -= mileage * 0.02; 
+} 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print("SOC: "); 
+lcd1.print(soc, 1); 
+lcd1.print("%"); 
+lcd1.setCursor(0, 1); 
+lcd1.print("Range: "); 
+lcd1.print(mileage, 1); 
+lcd1.print(" km"); 
+delay(2000); 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print("Driving Pattern:"); 
+53 
+lcd1.setCursor(0, 1); 
+lcd1.print(pattern); 
+delay(2000); 
+String scrollMsg = "Range based on your driving pattern"; 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print(scrollMsg); 
+for (int i = 0; i < scrollMsg.length() + 16; i++) { 
+lcd1.scrollDisplayLeft(); 
+delay(200); 
+} 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print("Adj. Range:"); 
+lcd1.setCursor(0, 1); 
+lcd1.print(adjustedMileage, 1); 
+lcd1.print(" km"); 
+delay(2000); 
+DateTime now = rtc.now(); 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print(now.day() < 10 ? "0" : ""); lcd1.print(now.day()); 
+lcd1.print(":"); 
+lcd1.print(now.month() < 10 ? "0" : ""); lcd1.print(now.month()); 
+lcd1.print(":"); 
+lcd1.print(now.year()); 
+lcd1.setCursor(0, 1); 
+54 
+lcd1.print(now.hour() < 10 ? "0" : ""); lcd1.print(now.hour()); 
+lcd1.print(":"); 
+lcd1.print(now.minute() < 10 ? "0" : ""); lcd1.print(now.minute()); 
+lcd1.print(":"); 
+lcd1.print(now.second() < 10 ? "0" : ""); lcd1.print(now.second()); 
+delay(5000); 
+sensors.requestTemperatures(); 
+float tempC = sensors.getTempCByIndex(0); 
+lcd1.clear(); 
+lcd1.setCursor(0, 0); 
+lcd1.print("Temp: "); 
+lcd1.print(tempC, 1); 
+lcd1.print((char)223); 
+lcd1.print("C"); 
+lcd1.setCursor(0, 1); 
+lcd1.print(pattern); 
+delay(2000); 
+lcd2.clear(); 
+if (voltage33 < (0.4 * 3.3)) { 
+lcd2.setCursor(0, 0); 
+lcd2.print("Entering Battery"); 
+lcd2.setCursor(0, 1); 
+lcd2.print("Conservation Mode"); 
+delay(5000); 
+lcd2.clear(); 
+lcd2.setCursor(0, 0); 
+lcd2.print("Capping to Lower"); 
+55 
+lcd2.setCursor(0, 1); 
+lcd2.print("Power Output"); 
+} else { 
+lcd2.setCursor(0, 0); 
+lcd2.print("Removing the"); 
+lcd2.setCursor(0, 1); 
+lcd2.print("Output Cap"); 
+delay(5000); 
+lcd2.clear(); 
+lcd2.setCursor(0, 0); 
+lcd2.print("Entering"); 
+lcd2.setCursor(0, 1); 
+lcd2.print("Performance Mode"); 
+delay(10000); } 
+lcd2.clear(); 
+lcd2.setCursor(0, 0); 
+lcd2.print("Charging Station"); 
+if (soc < 20) { 
+lcd2.setCursor(0, 1); 
+lcd2.print("2 km away"); 
+} else if (soc >= 20 && soc <= 50) { 
+lcd2.setCursor(0, 1); 
+lcd2.print("4.1 km away"); 
+} else { 
+lcd2.setCursor(0, 1); 
+lcd2.print("4.7 km away"); 
+} 
+56 
+delay(5000); 
+float targetDistance = random(1, 101); 
+float requiredCharge = (targetDistance / adjustedMileage) * 100.0; 
+float chargingRate = (tempC > 25.0) ? 3.5 : 2.0; 
+float estimatedTime = requiredCharge / chargingRate; 
+lcd3.clear(); 
+lcd3.setCursor(0, 0); 
+lcd3.print("Est. KMs: "); 
+lcd3.print(targetDistance, 1); 
+lcd3.setCursor(0, 1); 
+lcd3.print("To Charge: "); 
+lcd3.print(requiredCharge, 1); 
+lcd3.print("%"); 
+delay(2000); 
+lcd3.clear(); 
+lcd3.setCursor(0, 0); 
+lcd3.print("Est. Time: "); 
+lcd3.print(estimatedTime, 1); 
+lcd3.print(" mins"); 
+lcd3.setCursor(0, 1); 
+lcd3.print(tempC > 25.0 ? "Fast Charging" : "Slow Charging"); 
+delay(5000); 
+}
